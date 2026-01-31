@@ -1,0 +1,81 @@
+# ==========================================================
+# verify_optim_perf_serverless.py
+# Vérification des optimisations et performances
+# Compatible Serverless Databricks
+# ==========================================================
+
+from pyspark.sql import functions as F
+
+# -----------------------------
+# Chemins des données
+# -----------------------------
+BASE_PATH = "/Volumes/workspace/ipsldata/capstoneipsl"
+
+SILVER_MAIN_PATH = f"{BASE_PATH}/data/silver/main_clean"
+SILVER_ENRICH_PATH = f"{BASE_PATH}/data/silver/enrich_clean"
+SILVER_JOINED_PATH = f"{BASE_PATH}/data/silver/joined"
+
+print("🚀 Début vérification optimisations et performances (Serverless)")
+
+# ==========================================================
+# Fonction utilitaire pour vérifier un DataFrame
+# ==========================================================
+def verify_df(path, name):
+    print("\n============================================================")
+    print(f"🔍 Vérification pour {name}")
+
+    # 1️⃣ Lecture DataFrame
+    try:
+        df = spark.read.parquet(path)
+    except Exception as e:
+        print(f"⚠️ Impossible de lire les données : {e}")
+        return None
+
+    # 2️⃣ Nombre de fichiers Parquet sur disque (approx. partitions)
+    try:
+        files = dbutils.fs.ls(path)
+        parquet_files = [f for f in files if f.path.endswith(".parquet")]
+        print(f"📌 Nombre de fichiers Parquet pour '{name}': {len(parquet_files)} (approx. partitions)")
+    except Exception as e:
+        print(f"⚠️ Impossible de lister les fichiers : {e}")
+
+    # 3️⃣ Schéma et exemple de données
+    print("📌 Schéma des colonnes :")
+    df.printSchema()
+    print("📌 Exemple de données :")
+    df.show(5, truncate=False)
+
+    # 4️⃣ Plan physique détaillé
+    print("📌 Plan physique détaillé (explain) :")
+    try:
+        df.explain(True)
+        print("ℹ️ Vérifier manuellement 'BroadcastHashJoin' ou shuffles dans le plan ci-dessus.")
+    except Exception as e:
+        print(f"⚠️ Explain non disponible sur Serverless: {e}")
+
+    # 5️⃣ Note cache / persist
+    print("ℹ️ Cache / persist : Sur Serverless, cache() / persist() non supporté.")
+    print("   Normalement, on cacherait le DataFrame pour éviter recalculs multiples.")
+
+    return df
+
+# ==========================================================
+# Vérification main_clean
+# ==========================================================
+df_main = verify_df(SILVER_MAIN_PATH, "main_clean")
+
+# ==========================================================
+# Vérification enrich_clean
+# ==========================================================
+df_enrich = verify_df(SILVER_ENRICH_PATH, "enrich_clean")
+
+# ==========================================================
+# Vérification joined
+# ==========================================================
+df_joined = verify_df(SILVER_JOINED_PATH, "joined")
+
+print("\n🎯 Vérification des optimisations et performances terminée !")
+print("ℹ️ Pour Serverless, lire manuellement le plan `explain` pour confirmer :")
+print("   - Broadcast join pour 'joined'")
+print("   - Partitionnement et shuffles")
+print("   - Lecture efficace en Parquet")
