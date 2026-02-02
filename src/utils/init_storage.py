@@ -34,3 +34,5 @@ def init_storage(spark, dbutils):
         dbutils.fs.mkdirs(path)
 
     return PATHS
+
+    
